@@ -1,0 +1,119 @@
+1.Show all orders placed in 2010
+SELECT * FROM products
+WHERE InvoiceDate BETWEEN '2010-01-01' AND '2010-12-31';
+
+2.Orders over $100, sorted by amount
+SELECT * FROM products
+WHERE UnitPrice > 100
+ORDER BY UnitPrice DESC;
+
+3.Total revenue
+SELECT SUM(UnitPrice) AS total_revenue FROM products;
+
+4.Average order value
+SELECT AVG(UnitPrice) AS avg_order_value FROM products;
+
+
+5.INNER JOIN
+SELECT c.CustomerID, c.Country, SUM(id.Quantity * p.UnitPrice) AS TotalSpent
+FROM invoice_details id
+JOIN customers c ON id.CustomerID = c.CustomerID
+JOIN products p ON id.StockCode = p.StockCode
+GROUP BY c.CustomerID, c.Country;
+
+6.LEFT JOIN
+SELECT c.CustomerID, c.Country, id.InvoiceNo, id.Quantity
+FROM customers c
+LEFT JOIN invoice_details id ON c.CustomerID = id.CustomerID;
+
+7.RIGHT JOIN
+SELECT c.CustomerID, c.Country, id.InvoiceNo, id.Quantity
+FROM customers c
+RIGHT JOIN invoice_details id ON c.CustomerID = id.CustomerID;
+
+8.SUBQUERIES
+1. Find Customers Who Spent More Than Average
+SELECT CustomerID, Country
+FROM customers
+WHERE CustomerID IN (
+    SELECT CustomerID
+    FROM invoice_details id
+    JOIN products p ON id.StockCode = p.StockCode
+    GROUP BY CustomerID
+    HAVING SUM(id.Quantity * p.UnitPrice) > (
+        SELECT AVG(total_spent)
+        FROM (
+            SELECT SUM(id.Quantity * p.UnitPrice) AS total_spent
+            FROM invoice_details id
+            JOIN products p ON id.StockCode = p.StockCode
+            GROUP BY CustomerID
+        ) AS avg_table
+    )
+);
+
+2. Find Top-Spending Customer
+SELECT CustomerID, Country
+FROM customers
+WHERE CustomerID = (
+    SELECT CustomerID
+    FROM invoice_details id
+    JOIN products p ON id.StockCode = p.StockCode
+    GROUP BY CustomerID
+    ORDER BY SUM(id.Quantity * p.UnitPrice) DESC
+    LIMIT 1
+);
+
+3. List All Products Never Ordered
+SELECT StockCode, Description
+FROM products
+WHERE StockCode NOT IN (
+    SELECT DISTINCT StockCode
+    FROM invoice_details
+);
+
+4. Get Countries With No Orders
+SELECT Country
+FROM customers
+WHERE CustomerID NOT IN (
+    SELECT DISTINCT CustomerID
+    FROM invoice_details
+);
+9.Useful Views for E-Commerce Dataset
+1. Customer Spending Summary View
+CREATE VIEW customer_spending AS
+SELECT 
+    c.CustomerID,
+    c.Country,
+    SUM(id.Quantity * p.UnitPrice) AS TotalSpent,
+    COUNT(DISTINCT id.InvoiceNo) AS TotalOrders
+FROM invoice_details id
+JOIN customers c ON id.CustomerID = c.CustomerID
+JOIN products p ON id.StockCode = p.StockCode
+GROUP BY c.CustomerID, c.Country;
+
+2.CREATE VIEW monthly_revenue AS
+SELECT 
+    DATE_FORMAT(i.InvoiceDate, '%Y-%m') AS Month,
+    SUM(id.Quantity * p.UnitPrice) AS Revenue
+FROM invoice_details id
+JOIN invoices i ON id.InvoiceNo = i.InvoiceNo
+JOIN products p ON id.StockCode = p.StockCode
+GROUP BY DATE_FORMAT(i.InvoiceDate, '%Y-%m');
+
+3.CREATE VIEW top_products AS
+SELECT 
+    p.StockCode,
+    p.Description,
+    SUM(id.Quantity * p.UnitPrice) AS TotalRevenue
+FROM invoice_details id
+JOIN products p ON id.StockCode = p.StockCode
+GROUP BY p.StockCode, p.Description
+ORDER BY TotalRevenue DESC
+LIMIT 5;
+
+10.How to Use a View:
+SELECT * FROM customer_spending;
+SELECT * FROM monthly_revenue WHERE Month = '2010-12';
+
+11.Indexes
+CREATE INDEX idx_invoice_date ON invoices(InvoiceDate);
